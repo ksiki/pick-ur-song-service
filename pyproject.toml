@@ -63,6 +63,7 @@ strict = true
 ignore_missing_imports = true
 disallow_untyped_decorators = false
 explicit_package_bases = true
+mypy_path = ["backend"]
 
 [tool.aerich]
 tortoise_orm = "app.db.config.TORTOISE_ORM"
