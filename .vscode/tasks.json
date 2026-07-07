@@ -1,0 +1,58 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Aerich: Init DB",
+            "type": "shell",
+            "command": "poetry run aerich init-db",
+            "options": {
+                "env": {
+                    "PYTHONPATH": "backend"
+                }
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Aerich: Migrate (Create SQL)",
+            "type": "shell",
+            "command": "poetry run aerich migrate --name ${input:migrationName}",
+            "options": {
+                "env": {
+                    "PYTHONPATH": "backend"
+                }
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Aerich: Upgrade (Apply SQL)",
+            "type": "shell",
+            "command": "poetry run aerich upgrade",
+            "options": {
+                "env": {
+                    "PYTHONPATH": "backend"
+                }
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        }
+    ],
+    "inputs": [
+        {
+            "id": "migrationName",
+            "type": "promptString",
+            "description": "Введите имя миграции (например: added_user_table):",
+            "default": "update_models"
+        }
+    ]
+}
