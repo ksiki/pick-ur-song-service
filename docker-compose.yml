@@ -4,7 +4,7 @@ services:
   # ---------------------------------------------
   db:
     image: postgres:17-alpine
-    container_name: pus_postgres
+    container_name: postgres
     restart: unless-stopped
     ports:
       - "5432:5432"
@@ -24,7 +24,7 @@ services:
 
   rabbitmq:
     image: rabbitmq:3.13-management-alpine
-    container_name: pus_rabbitmq
+    container_name: rabbitmq
     restart: unless-stopped
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
@@ -43,9 +43,11 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: pus_redis
+    container_name: redis
     restart: unless-stopped
     command: redis-server --save 60 1 --loglevel warning
+    ports:
+      - "6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -56,6 +58,38 @@ services:
     networks:
       - pus_network
 
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_USER:-admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:-password123}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - pus_network
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: minio_init
+    depends_on:
+      - minio
+    networks:
+      - pus_network
+    entrypoint: >
+      /bin/sh -c "
+      sleep 3;
+      mc alias set myminio http://minio:9000 $${MINIO_USER:-admin} $${MINIO_PASSWORD:-password123};
+      mc mb myminio/$${MINIO_DEFAULT_BUCKET:-reports} || true;
+      mc anonymous set public myminio/$${MINIO_DEFAULT_BUCKET:-reports} || true;
+      exit 0;
+      "
+
   # ---------------------------------------------
   # Backend-сервисы
   # ---------------------------------------------
@@ -63,16 +97,16 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    container_name: pus_api
+    container_name: api
     restart: unless-stopped
-    # command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
-    command: ./start.sh
+    # command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
+    command: bash ./backend/start.sh
     environment:
       - DATABASE_URL=postgres://${POSTGRES_USER:-pus_user}:${POSTGRES_PASSWORD:-pus_pass}@db:5432/${POSTGRES_DB:-pus_db}
       - RABBITMQ_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASS:-guest}@rabbitmq:5672/
       - REDIS_URL=redis://redis:6379/0
     volumes:
-      - ./backend:/app
+      - .:/app
     depends_on:
       db:
         condition: service_healthy
@@ -80,6 +114,10 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      minio:
+        condition: service_started
+      minio-init:
+        condition: service_completed_successfully
     networks:
       - pus_network
 
@@ -87,13 +125,18 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    container_name: pus_worker
+    container_name: worker
     restart: unless-stopped
-    command: taskiq worker app.broker.config:broker app.modules.music.tasks --reload
+    working_dir: /app/backend
+    command: faststream run app.broker.config:stream_app --reload
     environment:
       - DATABASE_URL=postgres://${POSTGRES_USER:-pus_user}:${POSTGRES_PASSWORD:-pus_pass}@db:5432/${POSTGRES_DB:-pus_db}
       - RABBITMQ_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASS:-guest}@rabbitmq:5672/
       - REDIS_URL=redis://redis:6379/0
+    env_file:
+      - .env
+    volumes:
+      - .:/app
     depends_on:
       api:
         condition: service_started
@@ -101,6 +144,10 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      minio:
+        condition: service_started
+      minio-init:
+        condition: service_completed_successfully
     networks:
       - pus_network
 
@@ -108,17 +155,31 @@ services:
   # Web Server (Nginx)
   # ---------------------------------------------
   nginx:
-    image: nginx:stable-alpine
-    container_name: pus_nginx
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: nginx
     restart: unless-stopped
     ports:
       - "80:80"
-      - "443:443"
+      # - "443:443"
     volumes:
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
-      - ./frontend/dist:/usr/share/nginx/html:ro # Сюда билдится SPA
     depends_on:
       - api
+    networks:
+      - pus_network
+
+
+  # ---------------------------------------------
+  # Development
+  # ---------------------------------------------
+  mailpit:
+    image: axllent/mailpit
+    container_name: mailpit
+    ports:
+      - "8025:8025"
+      - "1025:1025"
     networks:
       - pus_network
 
@@ -130,3 +191,4 @@ volumes:
   postgres_data:
   rabbitmq_data:
   redis_data:
+  minio_data:
