@@ -7,7 +7,7 @@ from tortoise import fields
 from tortoise.fields.relational import ForeignKeyRelation
 
 if TYPE_CHECKING:
-    from app.modules.bars.models import Bar
+    from app.modules.venues.models import Venue
 
 
 class PayoutStatus(str, Enum):
@@ -19,8 +19,8 @@ class PayoutStatus(str, Enum):
 class Payout(TimestampMixin):
     id = fields.UUIDField(pk=True, default=uuid6.uuid7)
 
-    bar: ForeignKeyRelation["Bar"] = fields.ForeignKeyField(
-        "models.Bar", related_name="payouts", on_delete=fields.RESTRICT
+    venue: ForeignKeyRelation["Venue"] = fields.ForeignKeyField(
+        "models.Venue", related_name="payouts", on_delete=fields.RESTRICT
     )
 
     period_start = fields.DateField()
@@ -29,7 +29,7 @@ class Payout(TimestampMixin):
     total_amount = fields.DecimalField(
         max_digits=10,
         decimal_places=2,
-        description="The amount to be paid to the bar (The sum of all bar_amount)",
+        description="The amount to be paid to the venue (The sum of all venue_amount)",
     )
 
     status = fields.CharEnumField(
@@ -43,7 +43,7 @@ class Payout(TimestampMixin):
     )
 
     paid_at = fields.DatetimeField(
-        null=True, description="The actual time of transfer to the IBAN of the bar"
+        null=True, description="The actual time of transfer to the IBAN of the venue"
     )
 
     class Meta:

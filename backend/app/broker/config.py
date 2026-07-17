@@ -1,30 +1,37 @@
-from typing import Any, Final
+import logging
 
-from app.core.config import settings
-from app.db.config import TORTOISE_ORM
-from taskiq import TaskiqEvents, TaskiqState
-from taskiq_aio_pika import AioPikaBroker
-from taskiq_redis import RedisAsyncResultBackend
+from faststream import FastStream
 from tortoise import Tortoise
 
-result_backend: Final = RedisAsyncResultBackend[Any](
-    redis_url=settings.REDIS_URL,
-)
+from app.broker.client import broker
+from app.db.config import TORTOISE_ORM
+from app.modules.auth.tasks import auth_router
+from app.modules.domains.tasks import domains_router
+from app.modules.orders.tasks import orders_router
+from app.modules.player.tasks import player_router
 
-broker: Final[AioPikaBroker] = AioPikaBroker(
-    url=settings.RABBITMQ_URL,
-).with_result_backend(result_backend)
+logger = logging.getLogger(__name__)
+
+stream_app = FastStream(broker)
+broker.include_router(orders_router)
+broker.include_router(auth_router)
+broker.include_router(domains_router)
+broker.include_router(player_router)
 
 
-@broker.on_event(TaskiqEvents.WORKER_STARTUP)
-async def startup(state: TaskiqState) -> None:
-    """Выполняется один раз при запуске процесса воркера"""
+@stream_app.on_startup
+async def startup() -> None:
+    """
+    Выполняется один раз при запуске процесса воркера FastStream.
+    Обязательно инициализируем пул соединений с БД, так как консьюмеры
+    будут писать статусы заказов (Ledger).
+    """
     await Tortoise.init(config=TORTOISE_ORM)
-    print("Taskiq Worker: DB connected")
+    logger.info("FastStream Worker: DB connected via Tortoise ORM")
 
 
-@broker.on_event(TaskiqEvents.WORKER_SHUTDOWN)
-async def shutdown(state: TaskiqState) -> None:
+@stream_app.on_shutdown
+async def shutdown() -> None:
     """Выполняется при остановке воркера"""
     await Tortoise.close_connections()
-    print("Taskiq Worker: Connection since DB be closed")
+    logger.info("FastStream Worker: DB connections closed")

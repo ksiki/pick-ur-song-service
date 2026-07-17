@@ -7,10 +7,14 @@ TORTOISE_ORM: Final[dict[str, Any]] = {
     "apps": {
         "models": {
             "models": [
-                "app.modules.bars.models",
+                "app.modules.auth.models",
+                "app.modules.venues.models",
                 "app.modules.orders.models",
                 "app.modules.payments.models",
                 "app.modules.music.models",
+                "app.modules.accounts.models",
+                "app.modules.domains.models",
+                "app.modules.soundcloud.models",
                 "aerich.models",
             ],
             "default_connection": "default",

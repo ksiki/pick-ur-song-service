@@ -18,11 +18,16 @@ class PlaylistTrack(BaseModel):
     )
 
     track_id = fields.CharField(max_length=255)
-    track_title = fields.CharField(max_length=255)
 
-    track_artwork_url = fields.CharField(max_length=512, null=True)
+    track_url = fields.CharField(max_length=255)
 
-    track_artist = fields.CharField(max_length=255)
+    title = fields.CharField(max_length=255)
+
+    artwork_url = fields.CharField(max_length=512, null=True)
+
+    artist = fields.CharField(max_length=255)
+
+    duration_ms = fields.IntField()
 
     sort_order = fields.IntField()
 

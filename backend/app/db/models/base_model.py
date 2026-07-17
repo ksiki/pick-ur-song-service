@@ -4,6 +4,7 @@ if TYPE_CHECKING:
     from tortoise.models import Model
 
     class BaseModel(Model):
-        pass
+        class Meta:
+            abstract = True
 else:
     from tortoise.models import Model as BaseModel  # noqa: F401

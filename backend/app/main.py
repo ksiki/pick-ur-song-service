@@ -1,3 +1,4 @@
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -6,9 +7,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from tortoise.contrib.fastapi import register_tortoise
 
-from app.broker.config import broker
+from app.api.v1.api import api_router
+from app.broker.client import broker
 from app.core.config import settings
+from app.core.redis import redis_cache
 from app.db.config import TORTOISE_ORM
+
+logger = logging.getLogger(__name__)
 
 if settings.SENTRY_DSN:
     sentry_sdk.init(
@@ -20,9 +25,13 @@ if settings.SENTRY_DSN:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    await broker.startup()
+    redis_cache.init()
+    await broker.start()
+
     yield
-    await broker.shutdown()
+
+    await redis_cache.close()
+    await broker.close()  # type: ignore[attr-defined]
 
 
 app = FastAPI(
@@ -41,6 +50,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(api_router, prefix="/api/v1")
 
 
 @app.get("/api/health")

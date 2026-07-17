@@ -8,8 +8,8 @@ from tortoise.fields.relational import ForeignKeyRelation
 from tortoise.indexes import Index
 
 if TYPE_CHECKING:
-    from app.modules.bars.models import Bar
     from app.modules.payments.models import Payout
+    from app.modules.venues.models import Venue
 
 
 class OrderStatus(str, Enum):
@@ -25,17 +25,19 @@ class OrderStatus(str, Enum):
 class Order(TimestampMixin):
     id = fields.UUIDField(pk=True, default=uuid6.uuid7)
 
-    bar: ForeignKeyRelation["Bar"] = fields.ForeignKeyField(
-        "models.Bar", related_name="orders", on_delete=fields.RESTRICT
+    venue: ForeignKeyRelation["Venue"] = fields.ForeignKeyField(
+        "models.Venue", related_name="orders", on_delete=fields.RESTRICT
     )
 
     guest_session_id = fields.CharField(max_length=255, null=True)
     table_number = fields.CharField(max_length=20, null=True)
 
     track_id = fields.CharField(max_length=255)
+    track_url = fields.CharField(max_length=255)
     track_title = fields.CharField(max_length=255)
     track_artist = fields.CharField(max_length=255)
     track_artwork_url = fields.CharField(max_length=512, null=True)
+    track_duration_ms = fields.IntField()
 
     amount_total = fields.DecimalField(max_digits=10, decimal_places=2)
     service_commission = fields.DecimalField(
@@ -47,10 +49,10 @@ class Order(TimestampMixin):
         default=0.00,
         description="Acquiring fees and other gateways",
     )
-    bar_amount = fields.DecimalField(
+    venue_amount = fields.DecimalField(
         max_digits=10,
         decimal_places=2,
-        description="Bar share (amount_total - service_commission - acquiring_fee)",
+        description="Venue share (amount_total - service_commission - acquiring_fee)",
     )
 
     status = fields.CharEnumField(
@@ -65,7 +67,7 @@ class Order(TimestampMixin):
     class Meta:
         table = "orders"
         indexes = [
-            Index(fields=("bar_id", "created_at")),
+            Index(fields=("venue_id", "created_at")),
             Index(
                 fields=("payout_id",),
                 name="idx_orders_unpaid",
